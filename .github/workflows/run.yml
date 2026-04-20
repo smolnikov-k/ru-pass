@@ -166,18 +166,29 @@ jobs:
           curl -sSL $WIN_EXTRA | grep "0.0.0.0" | awk '{print $2}' > ./community/data/win-extra
           curl -sSL $WIN_EXTRA | grep "0.0.0.0" | awk '{print $2}' > win-extra.txt
 
-      - name: Inject custom RU direct domains into category-ru
+      - name: Inject custom RU direct domains
         run: |
           if [ -f custom-ru-direct.txt ]; then
             while IFS= read -r domain; do
               [ -z "$domain" ] && continue
               [[ "$domain" =~ ^# ]] && continue
               escaped=$(echo "$domain" | sed 's|\.|\\.|g')
-              # Strip restrictive attributes (@ads, @!cn, etc) AND trailing # comments
+              # 1. Ensure domain is in category-ru without restrictive attributes
               sed -i -E "s|^${escaped}([[:space:]]+@[^[:space:]#]+)*([[:space:]]*#.*)?$|${domain}|" ./community/data/category-ru
-              # Append if still missing
               grep -qxF "$domain" ./community/data/category-ru || echo "$domain" >> ./community/data/category-ru
+              # 2. Remove domain + all subdomains from category-ads-all (don't block)
+              grep -vE "^(.*\.)?${escaped}\$" ./community/data/category-ads-all > /tmp/ads-filtered.txt || true
+              mv /tmp/ads-filtered.txt ./community/data/category-ads-all
+              # 3. Remove from gfw list (don't force-proxy)
+              if [ -f ./community/data/gfw ]; then
+                grep -vE "^(.*\.)?${escaped}\$" ./community/data/gfw > /tmp/gfw-filtered.txt || true
+                mv /tmp/gfw-filtered.txt ./community/data/gfw
+              fi
             done < custom-ru-direct.txt
+            echo "=== category-ru contains: ==="
+            grep -E "$(paste -sd'|' custom-ru-direct.txt)" ./community/data/category-ru || echo "(none)"
+            echo "=== category-ads-all contains: ==="
+            grep -E "$(paste -sd'|' custom-ru-direct.txt)" ./community/data/category-ads-all || echo "(none)"
           fi
 
       - name: Build geosite.dat file
