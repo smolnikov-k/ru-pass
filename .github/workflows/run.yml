@@ -167,29 +167,72 @@ jobs:
           curl -sSL $WIN_EXTRA | grep "0.0.0.0" | awk '{print $2}' > win-extra.txt
 
       - name: Inject custom RU direct domains
+        shell: python
         run: |
-          if [ -f custom-ru-direct.txt ]; then
-            while IFS= read -r domain; do
-              [ -z "$domain" ] && continue
-              [[ "$domain" =~ ^# ]] && continue
-              escaped=$(echo "$domain" | sed 's|\.|\\.|g')
-              # 1. Ensure domain is in category-ru without restrictive attributes
-              sed -i -E "s|^${escaped}([[:space:]]+@[^[:space:]#]+)*([[:space:]]*#.*)?$|${domain}|" ./community/data/category-ru
-              grep -qxF "$domain" ./community/data/category-ru || echo "$domain" >> ./community/data/category-ru
-              # 2. Remove domain + all subdomains from category-ads-all (don't block)
-              grep -vE "^(.*\.)?${escaped}\$" ./community/data/category-ads-all > /tmp/ads-filtered.txt || true
-              mv /tmp/ads-filtered.txt ./community/data/category-ads-all
-              # 3. Remove from gfw list (don't force-proxy)
-              if [ -f ./community/data/gfw ]; then
-                grep -vE "^(.*\.)?${escaped}\$" ./community/data/gfw > /tmp/gfw-filtered.txt || true
-                mv /tmp/gfw-filtered.txt ./community/data/gfw
-              fi
-            done < custom-ru-direct.txt
-            echo "=== category-ru contains: ==="
-            grep -E "$(paste -sd'|' custom-ru-direct.txt)" ./community/data/category-ru || echo "(none)"
-            echo "=== category-ads-all contains: ==="
-            grep -E "$(paste -sd'|' custom-ru-direct.txt)" ./community/data/category-ads-all || echo "(none)"
-          fi
+          import os, re, sys
+
+          if not os.path.exists("custom-ru-direct.txt"):
+              print("no custom-ru-direct.txt")
+              sys.exit(0)
+
+          with open("custom-ru-direct.txt") as f:
+              domains = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+          print(f"custom domains: {domains}")
+
+          def rewrite(path, transformer):
+              if not os.path.exists(path):
+                  return
+              with open(path) as f:
+                  lines = f.readlines()
+              new_lines = []
+              for line in lines:
+                  out = transformer(line)
+                  if out is not None:
+                      new_lines.append(out)
+              with open(path, "w") as f:
+                  f.writelines(new_lines)
+
+          # 1) In category-ru: strip attributes/comments for our domains
+          category_ru = "./community/data/category-ru"
+          present_in_ru = set()
+          def strip_attrs(line):
+              raw = line.rstrip("\n").rstrip()
+              for d in domains:
+                  # match "domain" or "domain @attr1 @attr2 # comment"
+                  m = re.match(r"^" + re.escape(d) + r"(\s+@[^\s#]+)*(\s*#.*)?$", raw)
+                  if m:
+                      present_in_ru.add(d)
+                      return d + "\n"
+              return line
+          rewrite(category_ru, strip_attrs)
+          # Append any missing
+          with open(category_ru) as f:
+              existing = {l.strip() for l in f}
+          with open(category_ru, "a") as f:
+              for d in domains:
+                  if d not in existing and d not in present_in_ru:
+                      f.write(d + "\n")
+
+          # 2) From category-ads-all and gfw: drop our domains and their subdomains
+          def make_dropper(doms):
+              patterns = [re.compile(r"^(.+\.)?" + re.escape(d) + r"$") for d in doms]
+              def drop(line):
+                  v = line.strip()
+                  if any(p.match(v) for p in patterns):
+                      return None
+                  return line
+              return drop
+
+          dropper = make_dropper(domains)
+          for path in ["./community/data/category-ads-all", "./community/data/gfw"]:
+              rewrite(path, dropper)
+
+          # Verify
+          import subprocess
+          pat = "|".join(re.escape(d) for d in domains)
+          for path in [category_ru, "./community/data/category-ads-all", "./community/data/gfw"]:
+              print(f"=== {path} ===")
+              subprocess.run(["grep", "-E", pat, path], check=False)
 
       - name: Build geosite.dat file
         run: |
