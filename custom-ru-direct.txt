@@ -1,1 +1,68 @@
+# Custom domains forced into geosite:category-ru (direct routing, RU bypass)
+# Union of:
+#   - user's bypass list (Happ RU Bypass manual rules)
+#   - VPN bot RU_DOMAINS (sync with /root/vpn-bot/bot.py)
+# Format: plain domain per line. Suffix-matched (matches domain + all subdomains).
+# TLDs intentionally included for redundancy with tld-ru/tld-su (built-in).
+
+ru
+su
+xn--p1ai
+
+# Yandex
+yandex.ru
+yandex.com
+yandex.net
+ya.ru
+
+# Mail.ru Group / VK
+mail.ru
+vk.com
+vk.me
+vkuseraudio.net
+vkuservideo.net
+userapi.com
+ok.ru
+
+# Banks / gov / fintech
+sber.ru
+sberbank.ru
+tinkoff.ru
+tbank.ru
+gosuslugi.ru
+mos.ru
+nalog.gov.ru
+
+# Marketplaces / retail
+wildberries.ru
+wbbasket.ru
+ozon.ru
+avito.ru
+
+# Media / content
+kinopoisk.ru
+rutube.ru
+dzen.ru
+vc.ru
+habr.com
+ria.ru
+rbc.ru
+lenta.ru
+
+# Telecom / maps / logistics / corp
+rt.ru
+rostelecom.ru
+mts.ru
+megafon.ru
+beeline.ru
+cdek.ru
+pochta.ru
+2gis.ru
+1c.ru
+gazprom.ru
+
+# Marketing / analytics (had @ads attribute upstream — forced into RU here)
 roistat.com
+
+# Own infrastructure
+hostingvibe.ru
