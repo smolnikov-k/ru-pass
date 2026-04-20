@@ -5,7 +5,7 @@ on:
     - cron: "0 22 * * *"
   push:
     branches:
-      - master
+      - main
     paths-ignore:
       - "**/README.md"
 permissions:
@@ -173,8 +173,8 @@ jobs:
               [ -z "$domain" ] && continue
               [[ "$domain" =~ ^# ]] && continue
               escaped=$(echo "$domain" | sed 's|\.|\\.|g')
-              # Strip restrictive attributes (@ads, @!cn, etc) from existing line
-              sed -i -E "s|^${escaped}( @[^ ]+)*$|${domain}|" ./community/data/category-ru
+              # Strip restrictive attributes (@ads, @!cn, etc) AND trailing # comments
+              sed -i -E "s|^${escaped}([[:space:]]+@[^[:space:]#]+)*([[:space:]]*#.*)?$|${domain}|" ./community/data/category-ru
               # Append if still missing
               grep -qxF "$domain" ./community/data/category-ru || echo "$domain" >> ./community/data/category-ru
             done < custom-ru-direct.txt
